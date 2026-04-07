@@ -4,7 +4,7 @@
 const DEMO_USERS = {
     // Students - login with student number
     '222028866': {
-        password: 'student123',
+        password: 'gowaseb123',
         role: 'student',
         name: 'Gowaseb Immanuel',
         id: '222028866'
@@ -30,21 +30,21 @@ const DEMO_USERS = {
     
     // Lecturers - login with lecturer ID
     'L001': {
-        password: 'lecturer123',
+        password: 'ebuke123',
         role: 'lecturer',
-        name: 'Dr. Ebuke Onyeka',
+        name: 'Master. Ebuke Onyeka',
         id: 'L001'
     },
     'L002': {
         password: 'smith456',
         role: 'lecturer',
-        name: 'Dr. James Smith',
+        name: 'Mr. Daniel Smith',
         id: 'L002'
     },
     'L003': {
         password: 'kamenye789',
         role: 'lecturer',
-        name: 'Dr. Kamenye Naomi',
+        name: 'Miss. Kamenye Naomi',
         id: 'L003'
     },
     'L004': {
@@ -65,31 +65,31 @@ const DEMO_USERS = {
 
 // Student to Module mapping - which modules each student is enrolled in
 const STUDENT_MODULES = {
-    '222028866': ['PRG611S', 'ITA611S', 'DSA611S'],      // Gowaseb Immanuel
-    '223045756': ['PRG611S', 'ITA611S', 'DSA611S'],      // Ebuke Onyeka
-    '223052574': ['PRG611S', 'ITA611S', 'WEB611S'],      // Undamuje Kahiiko
-    '221019855': ['PRG611S', 'ITA611S', 'WEB611S']       // Kamenye Naomi
+    '222028866': ['MAP7111S', 'SPS611S', 'DSA611S'],      // Gowaseb Immanuel
+    '223045756': ['MAP7111S', 'SPS611S', 'DSA611S'],      // Ebuke Onyeka
+    '223052574': ['MAP7111S', 'SPS611S', 'CTE611S'],      // Undamuje Kahiiko
+    '221019855': ['MAP7111S', 'SPS611S', 'CTE611S']       // Kamenye Naomi
 };
 
 // Module details
 const MODULE_DETAILS = {
-    'PRG611S': {
-        name: 'Introduction to Software Engineering',
-        lecturer: 'Dr. Ebuke Onyeka',
+    'MAP7111S': {
+        name: 'Mobile Application Programming',
+        lecturer: 'Master. Ebuke Onyeka',
         lecturerId: 'L001'
     },
-    'ITA611S': {
-        name: 'IT Architectures',
-        lecturer: 'Dr. James Smith',
+    'SPS611S': {
+        name: 'Software Process',
+        lecturer: 'Mr. Daniel Smith',
         lecturerId: 'L002'
     },
     'DSA611S': {
         name: 'Data Structures & Algorithms',
-        lecturer: 'Dr. Kamenye Naomi',
+        lecturer: 'Miss. Kamenye Naomi',
         lecturerId: 'L003'
     },
-    'WEB611S': {
-        name: 'Web Application Development',
+    'CTE611S': {
+        name: 'Compiler Techniques',
         lecturer: 'Dr. Fiavana Denilson',
         lecturerId: 'L004'
     }
