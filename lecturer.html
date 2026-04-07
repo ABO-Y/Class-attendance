@@ -222,7 +222,7 @@ function initializePage() {
     const history = getAttendanceHistory(currentModuleData.code);
     renderLecturerSummary(history);
     renderHistoryPanel(history);
-}
+
 
 function showSubmissionMessage(message, type = 'success') {
     showToast(message, type);
@@ -273,7 +273,7 @@ attendanceForm.addEventListener('submit', function(e) {
     showSubmissionMessage('Attendance saved successfully! Students will see updates on their dashboards.');
     console.log('Attendance submitted:', attendanceData);
 });
-
+}
 window.onload = initializePage;
 </script>
 
