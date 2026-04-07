@@ -55,7 +55,7 @@ const DEMO_USERS = {
     },
     
     // Admin
-    'admin': {
+    'ADMIN': {
         password: 'admin123',
         role: 'admin',
         name: 'System Administrator',
@@ -115,10 +115,15 @@ class AuthManager {
 
     // Login function
     login(username, password) {
-        const user = DEMO_USERS[username];
+        const key = username.trim().toUpperCase();
+        const user = DEMO_USERS[key];
         
         if (!user) {
             return { success: false, message: 'User not found' };
+        }
+        
+        if (password.length < 6) {
+            return { success: false, message: 'Password must have at least 6 characters.' };
         }
         
         if (user.password !== password) {
@@ -218,3 +223,48 @@ function formatUserDisplay() {
     }
     return 'Unknown User';
 }
+
+function saveAttendanceSession(moduleCode, attendanceData) {
+    const historyKey = 'attendanceHistory_' + moduleCode;
+    const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
+    existingHistory.unshift(attendanceData);
+    localStorage.setItem(historyKey, JSON.stringify(existingHistory.slice(0, 20)));
+    localStorage.setItem('attendanceData_' + moduleCode, JSON.stringify(attendanceData));
+}
+
+function getAttendanceHistory(moduleCode) {
+    return JSON.parse(localStorage.getItem('attendanceHistory_' + moduleCode) || '[]');
+}
+
+function getLatestAttendance(moduleCode) {
+    return JSON.parse(localStorage.getItem('attendanceData_' + moduleCode) || 'null');
+}
+
+function getModuleAverage(moduleCode) {
+    const history = getAttendanceHistory(moduleCode);
+    if (history.length === 0) return null;
+    const total = history.reduce((sum, session) => sum + (session.percentage || 0), 0);
+    return Math.round(total / history.length);
+}
+
+function formatTimestamp(timestamp) {
+    if (!timestamp) return 'No data';
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('toast-hide');
+        toast.addEventListener('transitionend', () => toast.remove());
+    }, 3200);
+}
+

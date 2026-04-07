@@ -9,6 +9,7 @@
 <body>
 
 <div class="navbar"></div>
+<div id="toast-container" class="toast-container"></div>
 
 <div class="container">
     <h1>✏️ Mark Attendance</h1>
@@ -18,6 +19,9 @@
         <p><strong>Date:</strong> <span id="current-date"></span></p>
         <p><strong>Lecturer:</strong> <span id="lecturer-name"></span></p>
     </div>
+
+    <div id="lecturer-summary" class="summary-grid"></div>
+    <div id="history-panel" class="module-history"></div>
 
     <form id="attendance-form">
         <h2 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin: 20px 0;">Student Attendance</h2>
@@ -95,14 +99,75 @@ const lecturerModules = {
     }
 };
 
-// Get current lecturer's module
 let currentModuleData = null;
+
+function renderLecturerSummary(history) {
+    const totalSessions = history.length;
+    const averageAttendance = totalSessions > 0 ? Math.round(history.reduce((sum, s) => sum + s.percentage, 0) / totalSessions) : 0;
+    const mostRecent = history.length ? history[0] : null;
+    const presentCount = history.reduce((sum, s) => sum + s.presentStudents.length, 0);
+    const absentCount = history.reduce((sum, s) => sum + (s.totalStudents - s.presentStudents.length), 0);
+
+    document.getElementById('lecturer-summary').innerHTML = `
+        <div class="summary-card">
+            <h3>${totalSessions}</h3>
+            <p>Sessions Logged</p>
+        </div>
+        <div class="summary-card">
+            <h3>${averageAttendance}%</h3>
+            <p>Avg. Class Attendance</p>
+        </div>
+        <div class="summary-card">
+            <h3>${presentCount}</h3>
+            <p>Total Presences</p>
+        </div>
+        <div class="summary-card">
+            <h3>${absentCount}</h3>
+            <p>Total Absences</p>
+        </div>
+        <div class="summary-card" style="background-color: #fff3cd; color: #856404;">
+            <h3>${mostRecent ? formatTimestamp(mostRecent.submittedAt) : 'N/A'}</h3>
+            <p>Last Submission</p>
+        </div>
+    `;
+}
+
+function renderHistoryPanel(history) {
+    const historyPanel = document.getElementById('history-panel');
+    if (!historyPanel) return;
+
+    if (!history.length) {
+        historyPanel.innerHTML = '<p style="color: #666;">No attendance sessions saved yet. Record a session to build history.</p>';
+        return;
+    }
+
+    historyPanel.innerHTML = `
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Present</th>
+                    <th>Absent</th>
+                    <th>Attendance %</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${history.map(entry => `
+                    <tr>
+                        <td>${formatTimestamp(entry.submittedAt)}</td>
+                        <td>${entry.presentStudents.length}</td>
+                        <td>${entry.totalStudents - entry.presentStudents.length}</td>
+                        <td>${entry.percentage}%</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
 
 function initializePage() {
     const lecturer = auth.getCurrentUser();
     const lecturerId = lecturer.id;
-    
-    // Get module assigned to this lecturer
     currentModuleData = lecturerModules[lecturerId];
     
     if (!currentModuleData) {
@@ -116,7 +181,6 @@ function initializePage() {
 
     document.getElementById('lecturer-name').textContent = lecturer.name;
 
-    // Set current date
     const today = new Date();
     document.getElementById('current-date').textContent = today.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -125,7 +189,6 @@ function initializePage() {
         day: 'numeric'
     });
 
-    // Update module display
     document.querySelector('.card').innerHTML = `
         <p><strong>Module:</strong> ${currentModuleData.code} - ${currentModuleData.name}</p>
         <p><strong>Date:</strong> <span id="current-date"></span></p>
@@ -139,7 +202,6 @@ function initializePage() {
         day: 'numeric'
     });
 
-    // Populate attendance table
     const tbody = document.getElementById('attendance-table');
     tbody.innerHTML = currentModuleData.students.map((student, index) => `
         <tr>
@@ -156,10 +218,25 @@ function initializePage() {
             </td>
         </tr>
     `).join('');
+
+    const history = getAttendanceHistory(currentModuleData.code);
+    renderLecturerSummary(history);
+    renderHistoryPanel(history);
+}
+
+function showSubmissionMessage(message, type = 'success') {
+    showToast(message, type);
+    const successMsg = document.getElementById('success-message');
+    successMsg.textContent = message;
+    successMsg.classList.remove('hidden');
+    setTimeout(() => {
+        successMsg.classList.add('hidden');
+    }, 4200);
 }
 
 // Handle form submission
-document.getElementById('attendance-form').addEventListener('submit', function(e) {
+const attendanceForm = document.getElementById('attendance-form');
+attendanceForm.addEventListener('submit', function(e) {
     e.preventDefault();
 
     const checkboxes = document.querySelectorAll('.student-checkbox');
@@ -171,11 +248,15 @@ document.getElementById('attendance-form').addEventListener('submit', function(e
             present: true
         }));
 
+    if (presentStudents.length === 0) {
+        showToast('Please select at least one present student before saving.', 'error');
+        return;
+    }
+
     const totalStudents = checkboxes.length;
     const presentCount = presentStudents.length;
     const percentage = Math.round((presentCount / totalStudents) * 100);
 
-    // Save attendance data to localStorage for students to see
     const attendanceData = {
         courseCode: currentModuleData.code,
         courseName: currentModuleData.name,
@@ -186,21 +267,13 @@ document.getElementById('attendance-form').addEventListener('submit', function(e
         submittedBy: auth.getCurrentUser().name
     };
 
-    localStorage.setItem('attendanceData_' + currentModuleData.code, JSON.stringify(attendanceData));
-
-    // Show success message
-    const successMsg = document.getElementById('success-message');
-    successMsg.classList.remove('hidden');
-
-    // Hide message after 5 seconds
-    setTimeout(() => {
-        successMsg.classList.add('hidden');
-    }, 5000);
-
+    saveAttendanceSession(currentModuleData.code, attendanceData);
+    renderLecturerSummary(getAttendanceHistory(currentModuleData.code));
+    renderHistoryPanel(getAttendanceHistory(currentModuleData.code));
+    showSubmissionMessage('Attendance saved successfully! Students will see updates on their dashboards.');
     console.log('Attendance submitted:', attendanceData);
 });
 
-// Initialize on page load
 window.onload = initializePage;
 </script>
 

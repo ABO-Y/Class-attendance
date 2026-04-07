@@ -17,6 +17,9 @@
     <!-- Threshold Alert -->
     <div id="alert-container"></div>
 
+    <!-- Summary Cards -->
+    <div id="summary-grid" class="summary-grid"></div>
+
     <!-- Modules Section -->
     <h2 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin: 30px 0 20px 0;">Your Modules</h2>
     <div class="card-container" id="display-area">
@@ -40,6 +43,38 @@ if (!checkAuth('student')) {
 // Initialize navbar
 renderNavbar('Student Dashboard');
 
+function renderStudentSummary(modules) {
+    const completed = modules.filter(m => m.percentage > 0).length;
+    const pending = modules.filter(m => m.percentage === 0).length;
+    const average = completed > 0
+        ? Math.round(modules.filter(m => m.percentage > 0).reduce((sum, m) => sum + m.percentage, 0) / completed)
+        : 0;
+    const atRisk = modules.filter(m => m.percentage > 0 && m.percentage < 80).length;
+
+    document.getElementById('summary-grid').innerHTML = `
+        <div class="summary-card">
+            <h3>${modules.length}</h3>
+            <p>Total Modules</p>
+        </div>
+        <div class="summary-card">
+            <h3>${completed}</h3>
+            <p>Recorded Sessions</p>
+        </div>
+        <div class="summary-card">
+            <h3>${average}%</h3>
+            <p>Average Attendance</p>
+        </div>
+        <div class="summary-card">
+            <h3>${pending}</h3>
+            <p>Pending Modules</p>
+        </div>
+        <div class="summary-card" style="background-color: #d9534f; color: white;">
+            <h3>${atRisk}</h3>
+            <p>At-Risk Modules</p>
+        </div>
+    `;
+}
+
 function loadData() {
     const user = auth.getCurrentUser();
     const displayArea = document.getElementById('display-area');
@@ -49,49 +84,36 @@ function loadData() {
     // Update student name
     document.getElementById('student-name').textContent = user.name + ' (' + user.id + ')';
 
-    // Get all modules for this student
     const enrolledModuleCodes = STUDENT_MODULES[studentId] || [];
-    
     if (enrolledModuleCodes.length === 0) {
         displayArea.innerHTML = `<p style="color: #999;">No modules enrolled</p>`;
+        document.getElementById('summary-grid').innerHTML = '';
         return;
     }
 
-    // Build modules array with details
-    let modules = enrolledModuleCodes.map(code => {
+    const modules = enrolledModuleCodes.map(code => {
         const details = MODULE_DETAILS[code];
+        const history = getAttendanceHistory(code);
+        const latest = history.length ? history[0] : null;
         return {
             code: code,
             name: details.name,
             lecturer: details.lecturer,
-            percentage: 0,
-            defaultPercentage: 0
+            percentage: latest ? latest.percentage : 0,
+            lastUpdated: latest ? latest.submittedAt : null,
+            history: history.slice(0, 3)
         };
     });
 
-    // Load attendance data from localStorage for each module
-    modules = modules.map(m => {
-        const attendanceData = localStorage.getItem('attendanceData_' + m.code);
-        if (attendanceData) {
-            const data = JSON.parse(attendanceData);
-            return { ...m, percentage: data.percentage };
-        }
-        return m;
-    });
-
-    // Check if any module is below threshold
     const atRiskCount = modules.filter(m => m.percentage < 80 && m.percentage > 0).length;
+    alertContainer.innerHTML = atRiskCount > 0 ? `
+        <div class="alert alert-warning">
+            <strong>⚠️ Attendance Alert:</strong> You are currently below the 80% threshold in ${atRiskCount} module${atRiskCount > 1 ? 's' : ''}.
+        </div>
+    ` : `<div class="alert alert-success">All recorded modules are on track.</div>`;
 
-    // Display alert
-    if (atRiskCount > 0) {
-        alertContainer.innerHTML = `
-            <div class="alert alert-warning">
-                <strong>⚠️ Attendance Alert:</strong> You are currently below the 80% threshold in ${atRiskCount} module${atRiskCount > 1 ? 's' : ''}.
-            </div>
-        `;
-    }
+    renderStudentSummary(modules);
 
-    // Display modules as cards
     displayArea.innerHTML = modules.map(module => `
         <div class="card">
             <h3>${module.code}: ${module.name}</h3>
@@ -99,7 +121,7 @@ function loadData() {
                 <strong>Lecturer:</strong> ${module.lecturer}
             </div>
             <div style="margin-top: 10px;">
-                <strong>Attendance Rate:</strong>
+                <strong>Latest Attendance:</strong>
                 <div class="percentage" style="font-size: 32px; font-weight: bold; margin: 10px 0; color: ${module.percentage === 0 ? '#999' : module.percentage >= 80 ? '#28a745' : '#dc3545'};">
                     ${module.percentage === 0 ? 'Not yet recorded' : module.percentage + '%'}
                 </div>
@@ -110,8 +132,22 @@ function loadData() {
                         ${getStatus(module.percentage)}
                     </span>
                 </div>
+                <div style="margin-top: 12px; color: #555; font-size: 13px;">
+                    Last updated: ${formatTimestamp(module.lastUpdated)}
+                </div>
                 <progress value="${module.percentage}" max="100"></progress>
-            ` : `<p style="color: #999; font-size: 13px;">Waiting for attendance to be marked...</p>`}
+            ` : `<p style="color: #999; font-size: 13px; margin-top: 12px;">Waiting for attendance to be marked by your lecturer.</p>`}
+
+            ${module.history.length ? `
+                <div class="module-history">
+                    <h4>Recent Sessions</h4>
+                    <ul>
+                        ${module.history.map(session => `
+                            <li><strong>${formatTimestamp(session.submittedAt)}</strong> — ${session.presentStudents.length}/${session.totalStudents} present (${session.percentage}%)</li>
+                        `).join('')}
+                    </ul>
+                </div>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -128,10 +164,7 @@ function getStatus(percentage) {
     return 'Below Threshold - Action Required';
 }
 
-// Load data on page load and listen for storage changes
 window.onload = loadData;
-
-// Listen for updates from lecturer (localStorage changes trigger storage event)
 window.addEventListener('storage', (event) => {
     if (event.key && event.key.startsWith('attendanceData_')) {
         loadData();
