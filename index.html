@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NUST Attendance System - Login</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="login-container">
+    <div class="login-box">
+        <h1>NUST</h1>
+        <p class="subtitle">Attendance Tracking System</p>
+
+        <div class="demo-credentials">
+            <strong>📋 Demo Credentials:</strong>
+            
+            <div style="margin-top: 12px;">
+                <strong style="color: #1a73e8;">👨‍🎓 Students (login with Student Number):</strong>
+                <div class="demo-credential-row">222028866 / student123</div>
+                <div class="demo-credential-row">223045756 / ebuke456</div>
+                <div class="demo-credential-row">223052574 / kahiiko789</div>
+                <div class="demo-credential-row">221019855 / naomi321</div>
+            </div>
+
+            <div style="margin-top: 12px;">
+                <strong style="color: #1a73e8;">👨‍🏫 Lecturers (login with Lecturer ID):</strong>
+                <div class="demo-credential-row">L001 / lecturer123</div>
+                <div class="demo-credential-row">L002 / smith456</div>
+                <div class="demo-credential-row">L003 / kamenye789</div>
+                <div class="demo-credential-row">L004 / fiavana321</div>
+            </div>
+
+            <div style="margin-top: 12px;">
+                <strong style="color: #1a73e8;">🛡️ Admin:</strong>
+                <div class="demo-credential-row">admin / admin123</div>
+            </div>
+        </div>
+
+        <form onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter username" required autofocus>
+                <div id="username-error" class="error"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
+                <div id="password-error" class="error"></div>
+            </div>
+
+            <div id="login-error" class="alert alert-danger hidden"></div>
+
+            <button type="submit" class="btn btn-primary btn-block">Login</button>
+        </form>
+    </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+function handleLogin(event) {
+    event.preventDefault();
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const errorDiv = document.getElementById('login-error');
+
+    // Validate input
+    if (!username.trim() || !password.trim()) {
+        errorDiv.textContent = 'Please enter both username and password';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+
+    // Attempt login
+    const result = auth.login(username, password);
+
+    if (result.success) {
+        errorDiv.classList.add('hidden');
+        
+        // Redirect based on role
+        const redirects = {
+            'student': 'student.html',
+            'lecturer': 'lecturer.html',
+            'admin': 'admin.html'
+        };
+
+        const redirectUrl = redirects[result.user.role] || 'student.html';
+        window.location.href = redirectUrl;
+    } else {
+        errorDiv.textContent = result.message;
+        errorDiv.classList.remove('hidden');
+        document.getElementById('password').value = '';
+    }
+}
+
+// If already logged in, redirect to appropriate dashboard
+if (auth.isLoggedIn()) {
+    const redirects = {
+        'student': 'student.html',
+        'lecturer': 'lecturer.html',
+        'admin': 'admin.html'
+    };
+    const redirectUrl = redirects[auth.getUserRole()] || 'student.html';
+    window.location.href = redirectUrl;
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NUST Student Portal - Attendance</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="navbar"></div>
+
+<div class="container">
+    <h1>📚 Student Dashboard</h1>
+    <p style="color: #666; margin-bottom: 20px;"><strong>Student:</strong> <span id="student-name"></span></p>
+
+    <!-- Threshold Alert -->
+    <div id="alert-container"></div>
+
+    <!-- Modules Section -->
+    <h2 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin: 30px 0 20px 0;">Your Modules</h2>
+    <div class="card-container" id="display-area">
+        <!-- This will be filled by JavaScript -->
+    </div>
+
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+        <p style="color: #666; font-size: 13px;">
+            <strong>Note:</strong> Your attendance is updated by your lecturers. Changes may take a few minutes to appear.
+        </p>
+    </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+// Verify student access
+if (!checkAuth('student')) {
+    window.location.href = 'index.html';
+}
+
+// Initialize navbar
+renderNavbar('Student Dashboard');
+
+function loadData() {
+    const user = auth.getCurrentUser();
+    const displayArea = document.getElementById('display-area');
+    const alertContainer = document.getElementById('alert-container');
+    const studentId = user.id;
+
+    // Update student name
+    document.getElementById('student-name').textContent = user.name + ' (' + user.id + ')';
+
+    // Get all modules for this student
+    const enrolledModuleCodes = STUDENT_MODULES[studentId] || [];
+    
+    if (enrolledModuleCodes.length === 0) {
+        displayArea.innerHTML = `<p style="color: #999;">No modules enrolled</p>`;
+        return;
+    }
+
+    // Build modules array with details
+    let modules = enrolledModuleCodes.map(code => {
+        const details = MODULE_DETAILS[code];
+        return {
+            code: code,
+            name: details.name,
+            lecturer: details.lecturer,
+            percentage: 0,
+            defaultPercentage: 0
+        };
+    });
+
+    // Load attendance data from localStorage for each module
+    modules = modules.map(m => {
+        const attendanceData = localStorage.getItem('attendanceData_' + m.code);
+        if (attendanceData) {
+            const data = JSON.parse(attendanceData);
+            return { ...m, percentage: data.percentage };
+        }
+        return m;
+    });
+
+    // Check if any module is below threshold
+    const atRiskCount = modules.filter(m => m.percentage < 80 && m.percentage > 0).length;
+
+    // Display alert
+    if (atRiskCount > 0) {
+        alertContainer.innerHTML = `
+            <div class="alert alert-warning">
+                <strong>⚠️ Attendance Alert:</strong> You are currently below the 80% threshold in ${atRiskCount} module${atRiskCount > 1 ? 's' : ''}.
+            </div>
+        `;
+    }
+
+    // Display modules as cards
+    displayArea.innerHTML = modules.map(module => `
+        <div class="card">
+            <h3>${module.code}: ${module.name}</h3>
+            <div>
+                <strong>Lecturer:</strong> ${module.lecturer}
+            </div>
+            <div style="margin-top: 10px;">
+                <strong>Attendance Rate:</strong>
+                <div class="percentage" style="font-size: 32px; font-weight: bold; margin: 10px 0; color: ${module.percentage === 0 ? '#999' : module.percentage >= 80 ? '#28a745' : '#dc3545'};">
+                    ${module.percentage === 0 ? 'Not yet recorded' : module.percentage + '%'}
+                </div>
+            </div>
+            ${module.percentage > 0 ? `
+                <div>
+                    <span class="status-badge ${getStatusClass(module.percentage)}">
+                        ${getStatus(module.percentage)}
+                    </span>
+                </div>
+                <progress value="${module.percentage}" max="100"></progress>
+            ` : `<p style="color: #999; font-size: 13px;">Waiting for attendance to be marked...</p>`}
+        </div>
+    `).join('');
+}
+
+function getStatusClass(percentage) {
+    if (percentage >= 80) return 'status-safe';
+    if (percentage >= 70) return 'status-warning';
+    return 'status-danger';
+}
+
+function getStatus(percentage) {
+    if (percentage >= 80) return 'Eligible for Exam';
+    if (percentage >= 70) return 'Below Threshold - At Risk';
+    return 'Below Threshold - Action Required';
+}
+
+// Load data on page load and listen for storage changes
+window.onload = loadData;
+
+// Listen for updates from lecturer (localStorage changes trigger storage event)
+window.addEventListener('storage', (event) => {
+    if (event.key && event.key.startsWith('attendanceData_')) {
+        loadData();
+    }
+});
+</script>
+
+</body>
+</html>
+

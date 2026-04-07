@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NUST - Mark Attendance</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="navbar"></div>
+
+<div class="container">
+    <h1>✏️ Mark Attendance</h1>
+
+    <div class="card" style="background-color: #f8f9fa; margin-bottom: 20px;">
+        <p><strong>Module:</strong> Introduction to Software Engineering (PRG611S)</p>
+        <p><strong>Date:</strong> <span id="current-date"></span></p>
+        <p><strong>Lecturer:</strong> <span id="lecturer-name"></span></p>
+    </div>
+
+    <form id="attendance-form">
+        <h2 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin: 20px 0;">Student Attendance</h2>
+
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Student Number</th>
+                        <th style="text-align: center;">Mark Present</th>
+                    </tr>
+                </thead>
+                <tbody id="attendance-table">
+                    <!-- Will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-block">Submit Attendance</button>
+    </form>
+
+    <div id="success-message" class="alert alert-success hidden" style="margin-top: 20px;">
+        ✅ Attendance saved successfully! Students will see updates on their dashboards.
+    </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+// Verify lecturer access
+if (!checkAuth('lecturer')) {
+    window.location.href = 'index.html';
+}
+
+// Initialize navbar
+renderNavbar('Mark Attendance');
+
+// Lecturer to Module mapping
+const lecturerModules = {
+    'L001': {
+        code: 'PRG611S',
+        name: 'Introduction to Software Engineering',
+        students: [
+            { name: 'Gowaseb Immanuel', number: '222028866' },
+            { name: 'Ebuke Onyeka', number: '223045756' },
+            { name: 'Undamuje Kahiiko', number: '223052574' },
+            { name: 'Kamenye Naomi', number: '221019855' }
+        ]
+    },
+    'L002': {
+        code: 'ITA611S',
+        name: 'IT Architectures',
+        students: [
+            { name: 'Gowaseb Immanuel', number: '222028866' },
+            { name: 'Ebuke Onyeka', number: '223045756' },
+            { name: 'Undamuje Kahiiko', number: '223052574' },
+            { name: 'Kamenye Naomi', number: '221019855' }
+        ]
+    },
+    'L003': {
+        code: 'DSA611S',
+        name: 'Data Structures & Algorithms',
+        students: [
+            { name: 'Gowaseb Immanuel', number: '222028866' },
+            { name: 'Ebuke Onyeka', number: '223045756' }
+        ]
+    },
+    'L004': {
+        code: 'WEB611S',
+        name: 'Web Application Development',
+        students: [
+            { name: 'Undamuje Kahiiko', number: '223052574' },
+            { name: 'Kamenye Naomi', number: '221019855' }
+        ]
+    }
+};
+
+// Get current lecturer's module
+let currentModuleData = null;
+
+function initializePage() {
+    const lecturer = auth.getCurrentUser();
+    const lecturerId = lecturer.id;
+    
+    // Get module assigned to this lecturer
+    currentModuleData = lecturerModules[lecturerId];
+    
+    if (!currentModuleData) {
+        document.querySelector('.container').innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Error:</strong> No module assigned to this lecturer account.
+            </div>
+        `;
+        return;
+    }
+
+    document.getElementById('lecturer-name').textContent = lecturer.name;
+
+    // Set current date
+    const today = new Date();
+    document.getElementById('current-date').textContent = today.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    // Update module display
+    document.querySelector('.card').innerHTML = `
+        <p><strong>Module:</strong> ${currentModuleData.code} - ${currentModuleData.name}</p>
+        <p><strong>Date:</strong> <span id="current-date"></span></p>
+        <p><strong>Lecturer:</strong> ${lecturer.name}</p>
+    `;
+    
+    document.querySelector('#current-date').textContent = today.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    // Populate attendance table
+    const tbody = document.getElementById('attendance-table');
+    tbody.innerHTML = currentModuleData.students.map((student, index) => `
+        <tr>
+            <td>${student.name}</td>
+            <td>${student.number}</td>
+            <td style="text-align: center;">
+                <input 
+                    type="checkbox" 
+                    class="student-checkbox"
+                    data-student="${student.number}"
+                    data-name="${student.name}"
+                    ${index === 0 ? 'checked' : ''}
+                    style="width: 20px; height: 20px; cursor: pointer;">
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Handle form submission
+document.getElementById('attendance-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const checkboxes = document.querySelectorAll('.student-checkbox');
+    const presentStudents = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => ({
+            studentNumber: cb.dataset.student,
+            studentName: cb.dataset.name,
+            present: true
+        }));
+
+    const totalStudents = checkboxes.length;
+    const presentCount = presentStudents.length;
+    const percentage = Math.round((presentCount / totalStudents) * 100);
+
+    // Save attendance data to localStorage for students to see
+    const attendanceData = {
+        courseCode: currentModuleData.code,
+        courseName: currentModuleData.name,
+        percentage: percentage,
+        presentStudents: presentStudents,
+        totalStudents: totalStudents,
+        submittedAt: new Date().toISOString(),
+        submittedBy: auth.getCurrentUser().name
+    };
+
+    localStorage.setItem('attendanceData_' + currentModuleData.code, JSON.stringify(attendanceData));
+
+    // Show success message
+    const successMsg = document.getElementById('success-message');
+    successMsg.classList.remove('hidden');
+
+    // Hide message after 5 seconds
+    setTimeout(() => {
+        successMsg.classList.add('hidden');
+    }, 5000);
+
+    console.log('Attendance submitted:', attendanceData);
+});
+
+// Initialize on page load
+window.onload = initializePage;
+</script>
+
+</body>
+</html>
