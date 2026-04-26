@@ -79,6 +79,7 @@ function initializePage() {
     const stats = calculateSystemStatistics();
     updateStatistics(stats);
     populateModulesTable(stats.modules);
+    populateActivityLog();
 }
 
 function calculateSystemStatistics() {
@@ -233,26 +234,39 @@ window.onload = initializePage;
 // Listen for attendance submissions from lecturers
 window.addEventListener('storage', (event) => {
     if (event.key && event.key.startsWith('attendanceData_')) {
-        const data = JSON.parse(event.newValue);
-        updateActivityLog(data);
-        
-        // Refresh statistics and modules table
         const stats = calculateSystemStatistics();
         updateStatistics(stats);
         populateModulesTable(stats.modules);
+        populateActivityLog();
     }
 });
 
-function updateActivityLog(data) {
+function getAllAttendanceEntries() {
+    return Object.keys(MODULE_DETAILS)
+        .map(code => getLatestAttendance(code))
+        .filter(entry => entry && entry.submittedAt)
+        .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+}
+
+function populateActivityLog() {
     const activityLog = document.getElementById('activity-log');
-    const timestamp = new Date().toLocaleTimeString();
-    const activity = `
-        <div style="padding: 10px 0; border-bottom: 1px solid #ddd;">
-            <strong>${timestamp}</strong> - ${data.submittedBy} submitted attendance for ${data.courseCode}
-            (${data.presentStudents.length}/${data.totalStudents} present)
-        </div>
-    `;
-    activityLog.innerHTML = activity + activityLog.innerHTML;
+    const entries = getAllAttendanceEntries();
+
+    if (entries.length === 0) {
+        activityLog.innerHTML = '<p style="color: #999; text-align: center;">No submissions yet today</p>';
+        return;
+    }
+
+    activityLog.innerHTML = entries.slice(0, 10).map(entry => {
+        const submittedAt = new Date(entry.submittedAt).toLocaleString();
+        return `
+            <div style="padding: 12px 0; border-bottom: 1px solid #ddd;">
+                <strong>${submittedAt}</strong><br>
+                ${entry.submittedBy} submitted attendance for <strong>${entry.courseCode}</strong>
+                (${entry.presentStudents.length}/${entry.totalStudents} present)
+            </div>
+        `;
+    }).join('');
 }
 </script>
 

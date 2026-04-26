@@ -43,13 +43,40 @@ if (!checkAuth('student')) {
 // Initialize navbar
 renderNavbar('Student Dashboard');
 
+function getStudentAttendance(history, studentId) {
+    const totalSessions = history.length;
+    if (totalSessions === 0) {
+        return {
+            percentage: 0,
+            lastUpdated: null,
+            history: []
+        };
+    }
+
+    const personalHistory = history.map(session => ({
+        submittedAt: session.submittedAt,
+        present: session.presentStudents.some(s => s.studentNumber === studentId),
+        totalStudents: session.totalStudents,
+        percentage: session.presentStudents.length ? session.percentage : 0
+    }));
+
+    const attendedSessions = personalHistory.filter(session => session.present).length;
+    const percentage = totalSessions > 0 ? Math.round((attendedSessions / totalSessions) * 100) : 0;
+
+    return {
+        percentage,
+        lastUpdated: history[0].submittedAt,
+        history: personalHistory
+    };
+}
+
 function renderStudentSummary(modules) {
-    const completed = modules.filter(m => m.percentage > 0).length;
-    const pending = modules.filter(m => m.percentage === 0).length;
+    const completed = modules.filter(m => m.historyLength > 0).length;
+    const pending = modules.filter(m => m.historyLength === 0).length;
     const average = completed > 0
-        ? Math.round(modules.filter(m => m.percentage > 0).reduce((sum, m) => sum + m.percentage, 0) / completed)
+        ? Math.round(modules.filter(m => m.historyLength > 0).reduce((sum, m) => sum + m.percentage, 0) / completed)
         : 0;
-    const atRisk = modules.filter(m => m.percentage > 0 && m.percentage < 80).length;
+    const atRisk = modules.filter(m => m.historyLength > 0 && m.percentage < 80).length;
 
     document.getElementById('summary-grid').innerHTML = `
         <div class="summary-card">
@@ -94,18 +121,20 @@ function loadData() {
     const modules = enrolledModuleCodes.map(code => {
         const details = MODULE_DETAILS[code];
         const history = getAttendanceHistory(code);
-        const latest = history.length ? history[0] : null;
+        const studentAttendance = getStudentAttendance(history, studentId);
+
         return {
             code: code,
             name: details.name,
             lecturer: details.lecturer,
-            percentage: latest ? latest.percentage : 0,
-            lastUpdated: latest ? latest.submittedAt : null,
-            history: history.slice(0, 3)
+            percentage: studentAttendance.percentage,
+            lastUpdated: studentAttendance.lastUpdated,
+            history: studentAttendance.history.slice(0, 3),
+            historyLength: history.length
         };
     });
 
-    const atRiskCount = modules.filter(m => m.percentage < 80 && m.percentage > 0).length;
+    const atRiskCount = modules.filter(m => m.historyLength > 0 && m.percentage < 80).length;
     alertContainer.innerHTML = atRiskCount > 0 ? `
         <div class="alert alert-warning">
             <strong>⚠️ Attendance Alert:</strong> You are currently below the 80% threshold in ${atRiskCount} module${atRiskCount > 1 ? 's' : ''}.
@@ -121,12 +150,12 @@ function loadData() {
                 <strong>Lecturer:</strong> ${module.lecturer}
             </div>
             <div style="margin-top: 10px;">
-                <strong>Latest Attendance:</strong>
-                <div class="percentage" style="font-size: 32px; font-weight: bold; margin: 10px 0; color: ${module.percentage === 0 ? '#999' : module.percentage >= 80 ? '#28a745' : '#dc3545'};">
-                    ${module.percentage === 0 ? 'Not yet recorded' : module.percentage + '%'}
+                <strong>Attendance Rate:</strong>
+                <div class="percentage" style="font-size: 32px; font-weight: bold; margin: 10px 0; color: ${module.historyLength === 0 ? '#999' : module.percentage >= 80 ? '#28a745' : '#dc3545'};">
+                    ${module.historyLength === 0 ? 'Not yet recorded' : module.percentage + '%'}
                 </div>
             </div>
-            ${module.percentage > 0 ? `
+            ${module.historyLength > 0 ? `
                 <div>
                     <span class="status-badge ${getStatusClass(module.percentage)}">
                         ${getStatus(module.percentage)}
@@ -143,7 +172,11 @@ function loadData() {
                     <h4>Recent Sessions</h4>
                     <ul>
                         ${module.history.map(session => `
-                            <li><strong>${formatTimestamp(session.submittedAt)}</strong> — ${session.presentStudents.length}/${session.totalStudents} present (${session.percentage}%)</li>
+                            <li>
+                                <strong>${formatTimestamp(session.submittedAt)}</strong> —
+                                ${session.present ? 'Present ✅' : 'Absent ❌'}
+                                <span style="color: #666;">(Module attendance: ${session.percentage}%)</span>
+                            </li>
                         `).join('')}
                     </ul>
                 </div>
